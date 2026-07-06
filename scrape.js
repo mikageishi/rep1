@@ -11,7 +11,7 @@ const LIST_URL = `https://querie.me/user/${USER_ID}/recent`;
 const OUT_FILE = path.join(__dirname, 'qa_data.json');
 const CHECKPOINT = path.join(__dirname, '.qa_checkpoint.json');
 // 質問箱の総件数が1万件超と非常に多いため、直近分のみに絞って取得する
-const MAX_ITEMS = 3000;
+const MAX_ITEMS = 6000;
 
 // プロキシのTLS終端がChromeのTLS1.3 ClientHelloを処理できないため
 // TLS1.2上限で接続する(証明書検証は有効なまま)
@@ -114,17 +114,16 @@ async function fetchAnswer(context, item, attempt = 1) {
 (async () => {
   const browser = await chromium.launch(LAUNCH_OPTS);
 
-  let links;
   let done = {};
   if (fs.existsSync(CHECKPOINT)) {
     const cp = JSON.parse(fs.readFileSync(CHECKPOINT, 'utf-8'));
-    links = cp.links;
     done = cp.done || {};
-    console.log(`チェックポイントから再開: リンク ${links.length} 件 / 取得済 ${Object.keys(done).length} 件`);
-  } else {
-    links = await collectLinks(browser);
-    fs.writeFileSync(CHECKPOINT, JSON.stringify({ links, done: {} }));
+    console.log(`チェックポイントから取得済み回答を引き継ぎ: ${Object.keys(done).length} 件`);
   }
+  // MAX_ITEMS が増えている可能性があるため、リンク一覧は毎回スクロールし直して取得する
+  // (既に取得済みの回答は id 一致で done から再利用され、再取得されない)
+  const links = await collectLinks(browser);
+  fs.writeFileSync(CHECKPOINT, JSON.stringify({ links, done }));
 
   const context = await browser.newContext();
   await blockNoise(context);
