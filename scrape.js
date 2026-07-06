@@ -10,6 +10,8 @@ const USER_ID = 'cA2DTQN5gzZHMU6GuR3Wj8XKxPyp';
 const LIST_URL = `https://querie.me/user/${USER_ID}/recent`;
 const OUT_FILE = path.join(__dirname, 'qa_data.json');
 const CHECKPOINT = path.join(__dirname, '.qa_checkpoint.json');
+// 質問箱の総件数が1万件超と非常に多いため、直近分のみに絞って取得する
+const MAX_ITEMS = 3000;
 
 // プロキシのTLS終端がChromeのTLS1.3 ClientHelloを処理できないため
 // TLS1.2上限で接続する(証明書検証は有効なまま)
@@ -42,8 +44,8 @@ async function collectLinks(browser) {
   let stable = 0;
   let prevCount = 0;
   let rounds = 0;
-  // 新しいカードが増えなくなるまでスクロール
-  while (stable < 10) {
+  // 新しいカードが増えなくなるまで、または MAX_ITEMS に達するまでスクロール
+  while (stable < 10 && prevCount < MAX_ITEMS) {
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await page.waitForTimeout(1200);
     const count = await page.evaluate(() => document.querySelectorAll('a[href^="/answer/"]').length);
@@ -54,9 +56,9 @@ async function collectLinks(browser) {
       prevCount = count;
     }
     rounds++;
-    if (rounds % 10 === 0) console.log(`  スクロール ${rounds} 回目: ${count} 件`);
+    if (rounds % 5 === 0) console.log(`  スクロール ${rounds} 回目: ${count} 件`);
   }
-  console.log(`スクロール完了: 全 ${prevCount} 件の回答リンクを検出`);
+  console.log(`スクロール終了: ${prevCount} 件の回答リンクを検出 (上限 ${MAX_ITEMS} 件)`);
 
   const items = await page.evaluate(() => {
     return Array.from(document.querySelectorAll('a[href^="/answer/"]')).map((a) => {
@@ -73,9 +75,10 @@ async function collectLinks(browser) {
     });
   });
   await context.close();
-  // 重複除去
+  // 重複除去 (ドキュメント順 = 新しい順を維持しつつ MAX_ITEMS 件に切り詰め)
   const seen = new Set();
-  return items.filter((it) => (seen.has(it.id) ? false : (seen.add(it.id), true)));
+  const deduped = items.filter((it) => (seen.has(it.id) ? false : (seen.add(it.id), true)));
+  return deduped.slice(0, MAX_ITEMS);
 }
 
 async function fetchAnswer(context, item, attempt = 1) {
