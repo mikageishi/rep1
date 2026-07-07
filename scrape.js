@@ -11,7 +11,7 @@ const LIST_URL = `https://querie.me/user/${USER_ID}/recent`;
 const OUT_FILE = path.join(__dirname, 'qa_data.json');
 const CHECKPOINT = path.join(__dirname, '.qa_checkpoint.json');
 // 質問箱の総件数が1万件超と非常に多いため、直近分のみに絞って取得する
-const MAX_ITEMS = 9000;
+const MAX_ITEMS = 15121;
 
 // プロキシのTLS終端がChromeのTLS1.3 ClientHelloを処理できないため
 // TLS1.2上限で接続する(証明書検証は有効なまま)
